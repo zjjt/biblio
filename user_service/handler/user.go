@@ -3,46 +3,67 @@ package handler
 import (
 	"context"
 
-	log "github.com/micro/go-micro/v2/logger"
-
-	user "user_service/proto/user"
+	userP "github.com/zjjt/biblio/user_service/proto/user"
+	"github.com/zjjt/biblio/user_service/repository"
+	"golang.org/x/crypto/bcrypt"
 )
 
-type User struct{}
+//Service is the struct that handles all incoming traffic and requests
+type Service struct {
+	repo repository.Repository
+}
 
-// Call is a single request handler called via client.Call or the generated client code
-func (e *User) Call(ctx context.Context, req *user.Request, rsp *user.Response) error {
-	log.Info("Received User.Call request")
-	rsp.Msg = "Hello " + req.Name
+//InitService initialize the service handler
+func InitService(repo repository.Repository) *Service {
+	return &Service{repo}
+}
+
+//CreateUser does as its name says
+func (s *Service) CreateUser(ctx context.Context, req *userP.User, res *userP.Response) error {
+	//generate hash version of user password
+	hashPass, err := bcrypt.GenerateFromPassword([]byte(req.Pwd), bcrypt.DefaultCost)
+	if err != nil {
+		res.Success = false
+		res.Error = &userP.Error{
+			Code:   400,
+			Detail: err.Error(),
+		}
+		return nil
+	}
+	req.Pwd = string(hashPass)
+	if err := s.repo.CreateUser(req); err != nil {
+		res.Success = false
+		res.Error = &userP.Error{
+			Code:   400,
+			Detail: err.Error(),
+		}
+		return nil
+	}
+	res.Success = true
 	return nil
 }
 
-// Stream is a server side stream handler called via client.Stream or the generated client code
-func (e *User) Stream(ctx context.Context, req *user.StreamingRequest, stream user.User_StreamStream) error {
-	log.Infof("Received User.Stream request with count: %d", req.Count)
-
-	for i := 0; i < int(req.Count); i++ {
-		log.Infof("Responding: %d", i)
-		if err := stream.Send(&user.StreamingResponse{
-			Count: int64(i),
-		}); err != nil {
-			return err
+//GetUserByName does as its name says
+func (s *Service) GetUserByName(ctx context.Context, req *userP.Request, res *userP.Response) error {
+	user, err := s.repo.GetUserByName(req.UserName)
+	if err != nil {
+		res.Success = false
+		res.Error = &userP.Error{
+			Code:   500,
+			Detail: err.Error(),
 		}
+		return nil
 	}
-
+	// Compare the password with the hashed password stored in database
+	if err := bcrypt.CompareHashAndPassword([]byte(user.Pwd), []byte(req.UserPwd)); err != nil {
+		res.Success = false
+		res.Error = &userP.Error{
+			Code:   500,
+			Detail: err.Error(),
+		}
+		return nil
+	}
+	res.Success = true
+	res.User = user
 	return nil
-}
-
-// PingPong is a bidirectional stream handler called via client.Stream or the generated client code
-func (e *User) PingPong(ctx context.Context, stream user.User_PingPongStream) error {
-	for {
-		req, err := stream.Recv()
-		if err != nil {
-			return err
-		}
-		log.Infof("Got ping %v", req.Stroke)
-		if err := stream.Send(&user.Pong{Stroke: req.Stroke}); err != nil {
-			return err
-		}
-	}
 }
