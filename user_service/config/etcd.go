@@ -28,10 +28,10 @@ func (c defaultEtcdConfig) GetHost() string {
 
 //GetETCDConfig etcd config
 func GetETCDConfig() EtcdConfig {
-	//Comment when in production
-	os.Setenv("ETCD_PORT", "2379")
-	os.Setenv("ETCD_HOST", "127.0.0.1")
+
 	port, _ := strconv.Atoi(os.Getenv("ETCD_PORT"))
-	etcd := defaultEtcdConfig{Host: os.Getenv("ETCD_HOST"), Port: port}
+	host := os.Getenv("ETCD_HOST")
+
+	etcd := defaultEtcdConfig{Host: host, Port: port}
 	return etcd
 }

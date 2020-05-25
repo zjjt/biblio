@@ -2,8 +2,10 @@ package main
 
 import (
 	"fmt"
+	"os"
 	"time"
 
+	"github.com/joho/godotenv"
 	"github.com/micro/go-micro/v2"
 	log "github.com/micro/go-micro/v2/logger"
 	"github.com/micro/go-micro/v2/registry"
@@ -19,7 +21,14 @@ func registryOptions(ops *registry.Options) {
 	ops.Timeout = time.Second * 5
 	ops.Addrs = []string{fmt.Sprintf("%s:%d", etcdCfg.GetHost(), etcdCfg.GetPort())}
 }
+func init() {
+	if os.Getenv("ENV") != "PROD" || os.Getenv("ENV") != "TEST" {
+		if err := godotenv.Load("../.env"); err != nil {
+			log.Fatalf("Couldnt load .env file %v", err)
+		}
+	}
 
+}
 func main() {
 	//handling database connection and deferring its closing
 	db, err := config.CreatePostgresDBConnection()
